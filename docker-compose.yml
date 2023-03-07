@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  web:
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
+    working_dir: /code/web
+    command: sh -c "python app.py"
+    build: ./web
+    volumes:
+      - .:/code
+      - ./db:/db
+
+  web_socket:
+    restart: unless-stopped
+    volumes:
+      - .:/code
+      - ./db:/db
+    env_file:
+      - .env
+    environment:
+      - GUNICORN_BIND=0.0.0.0:80
+      - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
+    working_dir: /code/web
+    ports:
+      - "5645:5000"
+    build: ./web
+    command: sh -c "python app.py"
+  # test:
+  #   build: ./web # Mainly test the web image
+  #   working_dir: /code/web
+  #   env_file: .env # command: "sh -c 'pwd && (python -m pip install pytest -q) && (pytest .)'"
+  #   command: "sh -c './manage.py test'"
+  #   depends_on:
+  #     - db
+  #     - facerec
+  #     - redis
+  #     - imaginary
+  #   volumes:
+  #     - .:/code
+
+  # db_admin:
+  #   restart: unless-stopped
+  #   image: dpage/pgadmin4
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "16543:80"
+  #   depends_on:
+  #     - db

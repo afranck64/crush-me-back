@@ -1,0 +1,6 @@
+flask
+flask-dance[sqla]
+sqlalchemy
+tweepy
+python-dotenv
+gunicorn
