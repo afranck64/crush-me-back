@@ -1,8 +1,15 @@
+import logging
 from flask import Flask, redirect, url_for
 from flask_dance.contrib.github import make_github_blueprint, github
 from flask_dance.contrib.twitter import make_twitter_blueprint, twitter
 
 from bot.config import TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET
+
+import time
+
+from bot.models import Crush, CrushState, get_session, recreate_all, create_all
+
+create_all()
 
 app = Flask(__name__)
 app.secret_key = "supersekrit"  # Replace this with your own secret!
@@ -11,20 +18,6 @@ blueprint = make_twitter_blueprint(
     api_secret=TWITTER_CONSUMER_SECRET,
 )
 app.register_blueprint(blueprint, url_prefix="/login")
-
-import time
-
-from bot.models import Crush, CrushState, get_session, recreate_all
-
-
-# @app.route("/")
-# def index():
-#     if not twitter.authorized:
-#         time.sleep(1)
-#         return redirect(url_for("twitter.login"))
-#     resp = twitter.get("/user")
-#     assert resp.ok
-#     return "You are @{login} on Twitter".format(login=resp.json()["login"])
 
 
 from flask import render_template
@@ -60,4 +53,7 @@ def terms():
 
 
 if __name__ == "__main__":
+    gunicorn_logger = logging.getLogger("gunicorn.error")
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
     app.run(port=5000)

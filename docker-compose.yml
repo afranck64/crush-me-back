@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     environment:
-      - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
+      - SQLALCHEMY_DATABASE_URI=sqlite:////db/db.sqlite3
     working_dir: /web
     command: /web/entrypoint.sh
     build: ./web
@@ -14,22 +14,25 @@ services:
       - ./web:/web
       - ./db:/db
       - ./sockets:/sockets
+      - ./logs:/logs
 
-  web_socket:
+  web_dev:
     restart: unless-stopped
     volumes:
-      - .:/code
+      - ./web:/web
       - ./db:/db
+      - ./sockets:/sockets
+      - ./logs:/logs
     env_file:
       - .env
     environment:
       - GUNICORN_BIND=0.0.0.0:80
-      - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
+      - SQLALCHEMY_DATABASE_URI=sqlite:////db/db.sqlite3
     working_dir: /web
     ports:
-      - "5645:5000"
+      - "5645:80"
     build: ./web
-    command: sh ./entrypoint.sh
+    command: ./entrypoint.sh
   # test:
   #   build: ./web # Mainly test the web image
   #   working_dir: /code/web
