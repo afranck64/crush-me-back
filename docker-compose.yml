@@ -7,12 +7,13 @@ services:
       - .env
     environment:
       - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
-    working_dir: /code/web
-    command: sh -c "python app.py"
+    working_dir: /web
+    command: /web/entrypoint.sh
     build: ./web
     volumes:
-      - .:/code
+      - ./web:/web
       - ./db:/db
+      - ./sockets:/sockets
 
   web_socket:
     restart: unless-stopped
@@ -24,11 +25,11 @@ services:
     environment:
       - GUNICORN_BIND=0.0.0.0:80
       - SQLALCHEMY_DATABASE_URI="sqlite:////db/db.sqlite3"
-    working_dir: /code/web
+    working_dir: /web
     ports:
       - "5645:5000"
     build: ./web
-    command: sh -c "python app.py"
+    command: sh ./entrypoint.sh
   # test:
   #   build: ./web # Mainly test the web image
   #   working_dir: /code/web
