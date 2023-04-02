@@ -60,7 +60,8 @@ coverage.xml
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-
+*.sqlite3
+*.db
 # Flask stuff:
 instance/
 .webassets-cache
@@ -132,9 +133,9 @@ dmypy.json
 media/
 
 # static folders
-/static/
-/web/static/
-/api/static/
+# /static/
+# /web/static/
+# /api/static/
 
 # ignore db data
 backup/

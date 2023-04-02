@@ -1,6 +1,10 @@
 flask
 flask-dance[sqla]
+Flask-APScheduler
+flask-cors
+gunicorn
+python-dotenv
 sqlalchemy
 tweepy
-python-dotenv
-gunicorn
+#
+pytest

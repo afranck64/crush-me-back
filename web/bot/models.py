@@ -1,8 +1,8 @@
 import datetime
 import enum
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import UniqueConstraint
 import sqlalchemy as db
 
 from .config import SQLALCHEMY_DATABASE_URI
@@ -22,40 +22,24 @@ class CrushState(enum.Enum):
 
 class Crush(Base):
     __tablename__ = "crush"
-    crusher = db.Column(db.String, primary_key=True)
-    crushee = db.Column(db.String, primary_key=True)
+    id = db.Column(db.BigInteger().with_variant(db.Integer, "sqlite"), primary_key=True)
+    crusher = db.Column(db.String)
+    crushee = db.Column(db.String)
     crushee_screen_name = db.Column(db.String)
     created_on = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_on = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     message_id = db.Column(db.String)
     response_message_id = db.Column(db.String)
     matched = db.Column(db.Boolean, default=False)
-    # notified = db.Column(db.Boolean, default=False)
-    # deleted = db.Column(db.Boolean, default=False)
     state = db.Column(db.Enum(CrushState), default=CrushState.READY)
 
-    # def __repr__(self) -> str:
-    #     return f"Crush[{self.crusher} -> {self.crushee} ]"
+    __table_args__ = (
+        UniqueConstraint("crusher", "crushee", name="crusher_crusheed_unique_constraint"),
+        {"sqlite_autoincrement": True},
+    )
 
-
-# class Account(Base):
-#     table_name = "account"
-#     __name__ = table_name
-#     __tablename__ = table_name
-#     id = db.Column(db.Integer, primary_key=True)
-#     active = db.Column(db.Boolean)
-#     created_on = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-#     updated_on = db.Column(db.DateTime)
-
-# class Link(Base):
-#     __tablename__ = "link"
-#     url = db.Column(db.String(256), primary_key=True)
-#     is_online = db.Column(db.Boolean)
-#     last_set_from_account_on = db.Column(db.DateTime)
-#     last_checked_on = db.Column(db.DateTime)
-#     last_online_on = db.Column(db.DateTime)
-#     online_status_changed = db.Column(db.Boolean)
-#     account_id = db.Column(db.Integer, db.ForeignKey('account.id', ondelete="CASCADE"), primary_key=True)
+    def __repr__(self) -> str:
+        return f"Crush[{self.crusher} @ {self.crushee}]"
 
 
 def get_engine():

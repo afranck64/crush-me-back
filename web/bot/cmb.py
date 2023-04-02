@@ -5,12 +5,10 @@ from sqlalchemy import exc
 import tweepy
 from tweepy.models import DirectMessage
 from sqlalchemy.orm import aliased
+import sys
 
-from .config import TWITTER_BOT_ACCOUNT_ID, get_api
-
-api = get_api()
-
-from .models import Crush, CrushState, get_session, recreate_all
+from .config import TWITTER_BOT_ACCOUNT_ID, get_api, MAX_CRUSHER_ITEMS
+from .models import Crush, CrushState, get_session, recreate_all, Session
 
 
 """
@@ -34,13 +32,86 @@ ready -> matched ->
 - cleanup database
 """
 
+GET_DIRECT_MESSAGES_MAX_COUNT = 50
 
-class Core(object):
-    def __init__(self, api: tweepy.API, *args, **kwargs):
+
+class Bot(object):
+    def __init__(
+        self,
+        *,
+        api: tweepy.API,
+        session_getter: "callable" = None,
+        twitter_bot_account_id: str = None,
+        max_crusher_items: int = None,
+    ):
+        """_summary_
+
+        Args:
+            api (tweepy.API): _description_
+            session_getter (callable, optional): _description_. Defaults to None.
+            twitter_bot_account_id (str, optional): _description_. Defaults to None.
+            max_crusher_items (int, optional): _description_. Defaults to None.
+        """
+        if session_getter is None:
+            session_getter = get_session
+        if twitter_bot_account_id is None:
+            twitter_bot_account_id = TWITTER_BOT_ACCOUNT_ID
+        if max_crusher_items is None:
+            max_crusher_items = MAX_CRUSHER_ITEMS
+
         self.api = api
+        self.session_getter = session_getter
+        self.twitter_bot_account_id = twitter_bot_account_id
+        self.max_crusher_items = max_crusher_items
 
-    def register_crushes(self, crusher: str, crushees: "list[dict[str,str]]", message_id: str = None):
-        with get_session() as session:
+    def do_get_session(self, expire_on_commit: bool = True) -> Session:
+        return self.session_getter(expire_on_commit=expire_on_commit)
+
+    def do_send_direct_message(self, recipient_id: str, text: str):
+        self.api.send_direct_message(
+            recipient_id=recipient_id,
+            text=text,
+        )
+
+    def do_get_direct_messages(self, count: int = GET_DIRECT_MESSAGES_MAX_COUNT):
+        all_messages = []
+        messages = self.api.get_direct_messages(count=count)
+        return messages
+
+    def process_message(self, message: DirectMessage) -> "tuple[str,list[str]]":
+        print(f"Processing message: {message._json['id']}")
+        message_id = message._json["id"]
+        with self.do_get_session() as session:
+            message_already_processed = session.query(Crush).filter(Crush.message_id == message_id).first()
+        if message_already_processed:
+            warnings.warn(f"message with id: {message_id} has already been processed by the system.")
+            return None, []
+
+        # TODO: check max message limit
+        crusher = message.message_create["sender_id"]
+        crusher_crushes_count = session.query(Crush).filter(Crush.crusher == crusher).count()
+        if crusher_crushes_count >= self.max_crusher_items:
+            warnings.warn(f"user: {crusher} currently has no empty crush slot.")
+            return None, []
+
+        remaining_crusher_crushes = self.max_crusher_items - crusher_crushes_count
+
+        message_data = message.message_create["message_data"]
+
+        user_mentions = message_data["entities"]["user_mentions"]
+        crushees = [{"id": item["id_str"], "screen_name": item["screen_name"]} for item in user_mentions]
+
+        print(f"crusher: {crusher}, remaining: {remaining_crusher_crushes}")
+        if remaining_crusher_crushes < len(crushees):
+            warnings.warn(f"user: {crusher} does not have enough crush slots. Will skip some crushes")
+
+        allowed_crushees = crushees[:remaining_crusher_crushes]
+        self.register_crushes(crusher, allowed_crushees, message_id=message_id)
+        return crusher, crushees
+
+    def register_crushes(self, crusher: str, crushees: "list[dict[str,str]]", message_id: str = None) -> bool:
+        breached_integrity = False
+        with self.do_get_session() as session:
             for crushee in crushees:
                 crush = Crush(
                     crusher=crusher,
@@ -48,19 +119,19 @@ class Core(object):
                     crushee_screen_name=crushee["screen_name"],
                     message_id=message_id,
                 )
-                print("Register crush: ", crusher, "-->", crushee)
+                print(f"Register crush: {crusher} --> {crushee}")
                 session.add(crush)
             try:
                 session.commit()
             except exc.IntegrityError as err:
                 # TODO: [pseudo] anonymise error data before logging it
+                breached_integrity = True
                 warnings.warn(str(err))
-        # found_new_crushes = self.update_matched_crushes()
-        # return found_new_crushes
+        return breached_integrity
 
     def update_matched_crushes(self) -> bool:
         found_new_crushes = False
-        with get_session() as session:
+        with self.do_get_session() as session:
             other: Crush = aliased(Crush)
             query_result: "list[Crush]" = (
                 session.query(Crush)
@@ -82,101 +153,83 @@ class Core(object):
     def get_matched_crushes(self) -> "list[Crush]":
 
         query_result: "list[Crush]" = []
-        with get_session() as session:
+        with self.do_get_session(expire_on_commit=False) as session:
             query_result = session.query(Crush).filter(Crush.state == CrushState.MATCHED).all()
+
         return query_result
 
     def get_notified_crushes(self) -> "list[Crush]":
 
         query_result: "list[Crush]" = []
-        with get_session() as session:
+        with self.do_get_session(expire_on_commit=False) as session:
             query_result = session.query(Crush).filter(Crush.state == CrushState.NOTIFIED).all()
 
         return query_result
 
     def notify_crushes(self, crushes: "list[Crush]") -> "list[Crush]":
         for crush in crushes:
-            # NOTE: getting as atomic as possible
-            with get_session() as session:
-                # TODO: send Twitter direct message notification!
-                message: DirectMessage = self.api.send_direct_message(
-                    recipient_id=crush.crusher,
-                    text=f"Hello, @{crush.crushee_screen_name} crushed you back! ^_^\nTime to slide into their DM.",
-                )
-                print(f"@{crush.crusher} Found your crush: {crush.crushee}")
+            # NOTE: we may skip the direct notification in case there are issues with the API rate
+            message: DirectMessage = self.do_send_direct_message(
+                recipient_id=crush.crusher,
+                text=f"Hello, @{crush.crushee_screen_name} crushed you back! ^_^\nTime to slide into their DM.",
+            )
+            print(f"@{crush.crusher} Found your crush: {crush.crushee}")
+            # The more atomic we are, the better it is, to avoid locking the DB while wating for the Twitter API rate limit lock
+            with self.do_get_session() as session:
+                crush = session.get(entity=Crush, ident=crush.id)
                 crush.state = CrushState.NOTIFIED
                 session.add(crush)
                 session.commit()
-                # NOTE: For now, let's reduce the amount of API call >_<
-                # message.delete()
+
+            # TODO: delete message
+            # NOTE: We skip this step for now to reduce the amount of API calls >_<
+            # message.delete()
         return crushes
 
-    def clean_up(self, crushes: "list[Crush]"):
-        for crush in crushes:
-            print("cleaned-up crush: ", crush)
+    def clean_up(self):
+        """Delete all crushes in a notified state"""
 
-        with get_session() as session:
-            query_result = session.query(Crush).filter(Crush.state == CrushState.NOTIFIED).delete()
+        # TODO: delete messages older than the fixed constant (e.g. 30)
+        with self.session_getter() as session:
+            session.query(Crush).filter(Crush.state == CrushState.NOTIFIED).delete()
             session.commit()
 
-
-# class Bot:
-#     def __init__(self, *args, **kwargs):
-#         ...
-
-#     def process_message(self, message: DirectMessage) -> "tuple[str,list[str]]":
-#         ...
-#         message_data = message.message_create["message_data"]
-#         user_mentions = message_data["entities"]["user_mentions"]
-#         crusher = message.message_create["sender_id"]
-#         crushees = [item["id_str"] for item in user_mentions]
-#         return crusher, crushees
-
-
-class Workflow:
-    def __init__(self) -> None:
-        self.api = get_api()
-        self.core = Core(api=self.api)
-
-    def process_message(self, message: DirectMessage) -> "tuple[str,list[str]]":
-        message_data = message.message_create["message_data"]
-        print("message", message)
-        print("message_data: ", message_data)
-        user_mentions = message_data["entities"]["user_mentions"]
-        crusher = message.message_create["sender_id"]
-        crushees = [{"id": item["id_str"], "screen_name": item["screen_name"]} for item in user_mentions]
-        self.core.register_crushes(crusher, crushees)
-        return crusher, crushees
-
-    def fetch_and_register_crusher_crushees(self, count: int = 128):
-        messages: "list[DirectMessage]" = self.api.get_direct_messages(count=count)
+    def fetch_and_register_crusher_crushees(self, count: int = GET_DIRECT_MESSAGES_MAX_COUNT):
+        messages: "list[DirectMessage]" = self.do_get_direct_messages(count=count)
         for message in messages:
             recipient_id = message.message_create["target"]["recipient_id"]
             user_mentions = message.message_create["message_data"]["entities"]["user_mentions"]
-            if recipient_id == TWITTER_BOT_ACCOUNT_ID and user_mentions:
+            if recipient_id == self.twitter_bot_account_id and user_mentions:
                 crusher, crushees = self.process_message(message)
                 # TODO: send acknowlegment
-                # NOTE: due to low quota on the direct message endpoints, we avoid this step!!!
+                # NOTE: due to low quota on the direct message endpoints, we avoid this step for now -> bot webpage!!!
                 # notification_text = f"Registered your crushes: {[item['screen_name'] for item in crushees]}"
                 # notification_message: DirectMessage = self.api.send_direct_message(crusher, notification_text)
                 # message.delete()
                 # notification_message.delete()
 
-    def run(self):
-        self.fetch_and_register_crusher_crushees()
 
-        found_new_crushes = self.core.update_matched_crushes()
+class Workflow:
+    def __init__(
+        self,
+        bot: Bot = None,
+    ) -> None:
+        if bot is None:
+            bot = Bot(api=get_api())
+        self.bot = bot
+
+    def run(self):
+        self.bot.fetch_and_register_crusher_crushees()
+
+        found_new_crushes = self.bot.update_matched_crushes()
 
         if found_new_crushes:
-            matched_crushes = self.core.get_matched_crushes()
-            print("Matched crushes: ", matched_crushes)
+            matched_crushes = self.bot.get_matched_crushes()
+            print(f"Matched crushes: {matched_crushes}")
 
-            notified_crushes = self.core.notify_crushes(matched_crushes)
+            self.bot.notify_crushes(matched_crushes)
 
-            self.core.clean_up(matched_crushes)
+            notified_crushes = self.bot.get_notified_crushes()
+            print(f"Notified crushes: {notified_crushes}")
 
-
-"""
-send_direct_message(recipient_id, text, *, quick_reply_options=None, attachment_type=None, attachment_media_id=None, ctas=None, **kwargs) method of tweepy.api.API instance
-    send_direct_message(recipient_id, text, *, quick_reply_options,    
-    """
+            self.bot.clean_up()

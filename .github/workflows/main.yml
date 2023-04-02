@@ -39,4 +39,5 @@ jobs:
             git checkout ${{ steps.branch-name.outputs.current_branch }}
             git pull
             ./build.sh
+            docker-compose run test
             docker-compose down && docker-compose up -d web

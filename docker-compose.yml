@@ -33,25 +33,19 @@ services:
       - "5645:80"
     build: ./web
     command: ./entrypoint.sh
-  # test:
-  #   build: ./web # Mainly test the web image
-  #   working_dir: /code/web
-  #   env_file: .env # command: "sh -c 'pwd && (python -m pip install pytest -q) && (pytest .)'"
-  #   command: "sh -c './manage.py test'"
-  #   depends_on:
-  #     - db
-  #     - facerec
-  #     - redis
-  #     - imaginary
-  #   volumes:
-  #     - .:/code
 
-  # db_admin:
-  #   restart: unless-stopped
-  #   image: dpage/pgadmin4
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "16543:80"
-  #   depends_on:
-  #     - db
+  test:
+    restart: unless-stopped
+    volumes:
+      - ./web:/web
+      - ./db:/db
+      - ./sockets:/sockets
+      - ./logs:/logs
+    env_file:
+      - .env
+    environment:
+      - GUNICORN_BIND=0.0.0.0:80
+      - SQLALCHEMY_DATABASE_URI=sqlite://
+    working_dir: /web
+    build: ./web
+    command: python -m pytest
