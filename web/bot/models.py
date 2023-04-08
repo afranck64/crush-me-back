@@ -14,10 +14,9 @@ ENGINE = None
 
 
 class CrushState(enum.Enum):
-    READY = "READY"
+    PENDING = "PENDING"
     MATCHED = "MATCHED"
     NOTIFIED = "NOTIFIED"
-    DELETED = "DELETED"
 
 
 class Crush(Base):
@@ -31,7 +30,7 @@ class Crush(Base):
     message_id = db.Column(db.String)
     response_message_id = db.Column(db.String)
     matched = db.Column(db.Boolean, default=False)
-    state = db.Column(db.Enum(CrushState), default=CrushState.READY)
+    state = db.Column(db.Enum(CrushState), default=CrushState.PENDING)
 
     __table_args__ = (
         UniqueConstraint("crusher", "crushee", name="crusher_crusheed_unique_constraint"),

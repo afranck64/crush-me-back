@@ -24,57 +24,58 @@
       {% endfor %}
 
       {% block content %}  
-      <h1 style="text-align:center">Hello, {{ g.user['name'] }} | Crush me back!</h1>
         {% if g.user %}
-            {# <li><a href="{{ url_for('twitter.logout') }}">Log Out</a> #}        
-            
+          <h1 style="text-align:center">Hello, {{ g.user['name'] }} | Crush me back!</h1>
+          
 
-            <div>          
-              <nav class="navbar navbar-light bg-light" aria-label="Matched crushes">
-                <span class="navbar-brand mb-0 h1 text-center">Matched crushes</span>
-              </nav>
-              <div class="container">
-                <div class="row justify-content">
-                {% for crush in g.matched_crushes %}
-                  <div class="col">
-                    <div class="card mt-3 mb-3" style="width: 18rem;">
-                      <!-- <img src="" class="card-img-top" alt="..."> -->
-                      <div class="card-body">
-                        <h5 class="card-title">@{{crush.crushee_screen_name}}</h5>
-                        <p class="card-text"></p>
-                        <a href="https://twitter.com/messages/compose?recipient_id={{crush.crushee}}&text=Hello, looks like we are a match according to @CrushMeBackBot!"
-                        class="btn btn-primary twitter-dm-button" target="_blank" data-screen-name="@{{crush.crushee_screen_name}}">DM Crush</a>
-                        <small class="text-muted float-end">{{crush.created_on.date()}}</small>
-                      </div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-
-            <div>
-              <nav class="navbar navbar-light bg-light" aria-label="Pending crushes">
-                <span class="navbar-brand mb-0 h1 text-center">Pending crushes</span>
-              </nav>
-              <div class="container">
-                <div class="row justify-content">
-                {% for crush in g.ready_crushes %}
+          <div>          
+            <nav class="navbar navbar-light bg-light" aria-label="Matched crushes">
+              <span class="navbar-brand mb-0 h1 text-center">Matched crushes</span>
+            </nav>
+            <div class="container">
+              <div class="row justify-content">
+              {% for crush in g.matched_crushes %}
                 <div class="col">
                   <div class="card mt-3 mb-3" style="width: 18rem;">
                     <!-- <img src="" class="card-img-top" alt="..."> -->
                     <div class="card-body">
                       <h5 class="card-title">@{{crush.crushee_screen_name}}</h5>
                       <p class="card-text"></p>
-                      <span class="" target="_blank" data-screen-name="@{crush.crushee_screen_name}}" style="background:transparent; border:none; color:transparent;">DM Crush</span>
+                      <a href="https://twitter.com/messages/compose?recipient_id={{crush.crushee}}&text=Hello, looks like we are a match according to @CrushMeBackBot!"
+                      class="btn btn-primary twitter-dm-button" target="_blank" data-screen-name="@{{crush.crushee_screen_name}}">DM Crush</a>
                       <small class="text-muted float-end">{{crush.created_on.date()}}</small>
                     </div>
                   </div>
                 </div>
-                {% endfor %}
-              </div>
-              </div>
+              {% endfor %}
             </div>
-          {% else %}
+          </div>
+
+          <div>
+            <nav class="navbar navbar-light bg-light" aria-label="Pending crushes">
+              <span class="navbar-brand mb-0 h1 text-center">Pending crushes</span>
+            </nav>
+            <div class="container">
+              <div class="row justify-content">
+              {% for crush in g.pending_crushes %}
+              <div class="col">
+                <div class="card mt-3 mb-3" style="width: 18rem;">
+                  <!-- <img src="" class="card-img-top" alt="..."> -->
+                  <div class="card-body">
+                    <h5 class="card-title">@{{crush.crushee_screen_name}}</h5>
+                    <p class="card-text"></p>
+                    <span class="" target="_blank" data-screen-name="@{crush.crushee_screen_name}}" style="background:transparent; border:none; color:transparent;">DM Crush</span>
+                    <small class="text-muted float-end">{{crush.created_on.date()}}</small>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            </div>
+          </div>
+        {% else %}
+          <h1 style="text-align:center">Crush me back!</h1>
+          <a class="btn btn-primary twitter-dm-button" href="{{ url_for('twitter.login') }}">Log In</a>
         {% endif %}
       {% endblock %}
     </section>

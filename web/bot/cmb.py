@@ -23,7 +23,7 @@ Eve: -> Alice, Anna
 ## Flow:
 on new messages:
 
-ready -> matched ->
+pending -> matched -> notified
 - register crushes
 - [delete] crush messages
 - collect matching crushes
@@ -137,7 +137,7 @@ class Bot(object):
                 session.query(Crush)
                 .join(
                     other,
-                    (Crush.state == CrushState.READY)
+                    (Crush.state == CrushState.PENDING)
                     & (other.crushee == Crush.crusher)
                     & (other.crusher == Crush.crushee),
                 )

@@ -30,7 +30,7 @@ services:
       - SQLALCHEMY_DATABASE_URI=sqlite:////db/db.sqlite3
     working_dir: /web
     ports:
-      - "5645:80"
+      - "5000:80"
     build: ./web
     command: ./entrypoint.sh
 

@@ -252,7 +252,7 @@ class TestWorkflow(unittest.TestCase):
                 "crushee_screen_name": "bob",
                 "message_id": "3",
                 "created_on": dt.datetime(2022, 10, 11),
-                "state": CrushState.READY,
+                "state": CrushState.PENDING,
             },
         ]
         with core.do_get_session() as session:
@@ -306,7 +306,7 @@ class TestWorkflow(unittest.TestCase):
                 "crushee_screen_name": "bob",
                 "message_id": "3",
                 "created_on": dt.datetime(2022, 10, 11),
-                "state": CrushState.READY,
+                "state": CrushState.PENDING,
             },
         ]
 

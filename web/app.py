@@ -40,8 +40,8 @@ scheduler.init_app(app)
 scheduler.start()
 
 
-@scheduler.task("cron", id="do_job_1", hour="*/4")
-def run_workflow():
+@scheduler.task("cron", id="run_twitter_bot_workflow", hour="*/4")
+def run_twitter_bot_workflow():
     flow = Workflow()
     flow.run()
 
@@ -54,22 +54,28 @@ if TEST_TWITTER_RESPONSE:
 
 @app.route("/")
 def index():
-    if not twitter.authorized:
-        return redirect(url_for("twitter.login"))
-    resp_json = twitter.get("account/verify_credentials.json")
+    user_json = None
+    matched_crushes = []
+    pending_crushes = []
 
-    user_id = resp_json["id_str"]
-    with get_session() as session:
-        matched_crushes = (
-            session.query(Crush).filter((Crush.crusher == user_id) & (Crush.state == CrushState.MATCHED)).all()
-        )
-        ready_crushes = (
-            session.query(Crush).filter((Crush.crusher == user_id) & (Crush.state == CrushState.READY)).all()
-        )
+    if TEST_TWITTER_RESPONSE_JSON:
+        user_json = TEST_TWITTER_RESPONSE_JSON
+    elif twitter.authorized:
+        user_json = twitter.get("account/verify_credentials.json").json()
 
-    g.user = resp_json
+    if user_json is not None:
+        user_id = user_json["id_str"]
+        with get_session() as session:
+            matched_crushes = (
+                session.query(Crush).filter((Crush.crusher == user_id) & (Crush.state == CrushState.MATCHED)).all()
+            )
+            pending_crushes = (
+                session.query(Crush).filter((Crush.crusher == user_id) & (Crush.state == CrushState.PENDING)).all()
+            )
+
+    g.user = user_json
     g.matched_crushes = matched_crushes
-    g.ready_crushes = ready_crushes
+    g.pending_crushes = pending_crushes
 
     return render_template("base.html")
 
