@@ -70,7 +70,7 @@ class Bot(object):
         return self.session_getter()
 
     def do_send_direct_message(self, recipient_id: str, text: str):
-        self.api.send_direct_message(
+        return self.api.send_direct_message(
             recipient_id=recipient_id,
             text=text,
         )
