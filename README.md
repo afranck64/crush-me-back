@@ -13,6 +13,7 @@ To install the project, follow these steps:
 2. Install the project dependencies: [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/)
 3. Set up environment variables in a `.env` file in the project root folder based on the template `.env.template`
 4. [Optional] Set up a logging configuration in a `web/log.conf` file based on the template `web/log.conf.template`. The template can be used `as is`
+
 ## Usage
 
 To run the project use the following command:

@@ -64,8 +64,8 @@ class Bot(object):
         self.twitter_bot_account_id = twitter_bot_account_id
         self.max_crusher_items = max_crusher_items
 
-    def do_get_session(self, expire_on_commit: bool = True) -> Session:
-        return self.session_getter(expire_on_commit=expire_on_commit)
+    def do_get_session(self) -> Session:
+        return self.session_getter()
 
     def do_send_direct_message(self, recipient_id: str, text: str):
         self.api.send_direct_message(
@@ -74,7 +74,6 @@ class Bot(object):
         )
 
     def do_get_direct_messages(self, count: int = GET_DIRECT_MESSAGES_MAX_COUNT):
-        all_messages = []
         messages = self.api.get_direct_messages(count=count)
         return messages
 
@@ -153,7 +152,7 @@ class Bot(object):
     def get_matched_crushes(self) -> "list[Crush]":
 
         query_result: "list[Crush]" = []
-        with self.do_get_session(expire_on_commit=False) as session:
+        with self.do_get_session() as session:
             query_result = session.query(Crush).filter(Crush.state == CrushState.MATCHED).all()
 
         return query_result
@@ -161,7 +160,7 @@ class Bot(object):
     def get_notified_crushes(self) -> "list[Crush]":
 
         query_result: "list[Crush]" = []
-        with self.do_get_session(expire_on_commit=False) as session:
+        with self.do_get_session() as session:
             query_result = session.query(Crush).filter(Crush.state == CrushState.NOTIFIED).all()
 
         return query_result
@@ -201,11 +200,14 @@ class Bot(object):
             user_mentions = message.message_create["message_data"]["entities"]["user_mentions"]
             if recipient_id == self.twitter_bot_account_id and user_mentions:
                 crusher, crushees = self.process_message(message)
+                # delete the processed message if it containes at least one user mention to avoid having it listed again
+                if crushees:
+                    message.delete()
+
                 # TODO: send acknowlegment
                 # NOTE: due to low quota on the direct message endpoints, we avoid this step for now -> bot webpage!!!
                 # notification_text = f"Registered your crushes: {[item['screen_name'] for item in crushees]}"
                 # notification_message: DirectMessage = self.api.send_direct_message(crusher, notification_text)
-                # message.delete()
                 # notification_message.delete()
 
 
