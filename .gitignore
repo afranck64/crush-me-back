@@ -149,3 +149,6 @@ pgdata/
 
 # vscode
 .vscode
+
+# Logging config
+log.conf
