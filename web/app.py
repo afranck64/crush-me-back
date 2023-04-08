@@ -40,7 +40,7 @@ scheduler.init_app(app)
 scheduler.start()
 
 
-@scheduler.task("cron", id="run_twitter_bot_workflow", hour="*/4")
+@scheduler.task("cron", id="run_twitter_bot_workflow", minute="*/30")
 def run_twitter_bot_workflow():
     flow = Workflow()
     flow.run()
